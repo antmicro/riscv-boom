@@ -1339,6 +1339,11 @@ class BoomCore()(implicit p: Parameters) extends BoomModule
   //-------------------------------------------------------------
 
 
+  val coreMonitorBundle = Wire(new CoreMonitorBundle(xLen, fLen))
+  coreMonitorBundle := DontCare
+  coreMonitorBundle.clock  := clock
+  coreMonitorBundle.reset  := reset
+
   if (COMMIT_LOG_PRINTF) {
     var new_commit_cnt = 0.U
 
@@ -1398,14 +1403,21 @@ class BoomCore()(implicit p: Parameters) extends BoomModule
         new_ghist)
     }
     debug_ghist := new_ghist
+  } else {
+    coreMonitorBundle.timer := csr.io.time(31,0)
+    coreMonitorBundle.valid := csr.io.trace(0).valid && !csr.io.trace(0).exception
+    coreMonitorBundle.pc := Sext(csr.io.trace(0).iaddr(vaddrBitsExtended-1, 0), xLen)
+    coreMonitorBundle.inst := csr.io.trace(0).insn
+    coreMonitorBundle.excpt := csr.io.trace(0).exception
+    coreMonitorBundle.priv_mode := csr.io.trace(0).priv
+
+    when (csr.io.trace(0).valid) {
+      printf("C%d: %d [%d] pc=[%x] inst=[%x] DASM(%x)\n",
+        io.hartid, coreMonitorBundle.timer, coreMonitorBundle.valid,
+        coreMonitorBundle.pc,
+        coreMonitorBundle.inst, coreMonitorBundle.inst)
+    }
   }
-
-  // TODO: Does anyone want this debugging functionality?
-  val coreMonitorBundle = Wire(new CoreMonitorBundle(xLen, fLen))
-  coreMonitorBundle := DontCare
-  coreMonitorBundle.clock  := clock
-  coreMonitorBundle.reset  := reset
-
 
   //-------------------------------------------------------------
   //-------------------------------------------------------------
